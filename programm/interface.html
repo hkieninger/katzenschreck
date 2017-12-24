@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>PU</title>
+	<meta charset="utf-8"/>
+	<script type="text/javascript" src="color.js"></script>
+	<script type="text/javascript" src="space.js"></script>
+</head>
+<body>
+
+	<div>
+		<input type="checkbox" title="motor and laser" id="move" onclick="objectChanged = true;"/>
+		<br/>
+		<input title="hue max" id="huemax" type="range" min="0" max="255" value="255" class="slider" oninput="objectChanged = true;"/>
+		<input title="hue min" id="huemin" type="range" min="0" max="255" value="0" class="slider" oninput="objectChanged = true;"/>
+		<br/>
+		<input title="saturation max" id="saturationmax" type="range" min="0" max="255" value="255" class="slider" oninput="objectChanged = true;"/>
+		<input title="saturation min" id="saturationmin" type="range" min="0" max="255" value="0" class="slider" oninput="objectChanged = true;"/>
+		<br/>
+		<input title="value max" id="valuemax" type="range" min="0" max="255" value="255" class="slider" oninput="objectChanged = true;"/>
+		<input title="value min" id="valuemin" type="range" min="0" max="255" value="0" class="slider" oninput="objectChanged = true;"/>
+	</div>
+	
+	<br/>
+	<p id="object"></p>
+	<br/>
+	
+	<div>
+		<img title="original picture" id="originalpictureleft" alt="original picture left" style="height:300px"/>
+		<img title="original picture" id="originalpictureright" alt="original picture right" style="height:300px"/>
+		<br/>
+		<img title="processed picture" id="processedpictureleft" alt="processed picture left" style="height:300px"/>
+		<img title="processed picture" id="processedpictureright" alt="processed picture right" style="height:300px"/>
+	</div>
+	
+	<br/>
+	<canvas id="mycanvas" width="800px", height="600px" style="border:solid 1px red;padding:10px"></canvas>
+	<br/>
+	
+	<script type="text/javascript">
+	var objectChanged = false;
+	
+	var space = new Space(document.getElementById("mycanvas"));
+	
+	ajaxSharedMemory(250);
+
+	//negative interval == request once
+	function ajaxSharedMemory(interval) {
+		var requestTime = Date.now();
+		var request = new XMLHttpRequest();
+		request.onreadystatechange = function() {
+			if (this.readyState == 4 && this.status == 200) {
+				if(interval >= 0) {
+					var delay = interval - Date.now() + requestTime;
+					if(delay < 0)
+						delay = 0;
+					setTimeout(function() { ajaxSharedMemory(interval); }, delay);
+				}
+				responseSharedMemory(this.responseText);
+			}
+		};
+		var string = requestSharedMemory();
+		request.open("GET", string, true);
+		request.send();
+	}
+	
+	function responseSharedMemory(responseText) {
+		var response = parseResponse(responseText);
+		if(response == null) {
+			console.log(responseText);
+			return;
+		}
+				
+		if(!objectChanged) {
+			var maxSlider, minSlider;
+			
+			maxSlider = document.getElementById("huemax");
+			minSlider = document.getElementById("huemin"); 
+			if(parseInt(maxSlider.value) > parseInt(minSlider.value)) {
+				maxSlider.value = response.object.hue + response.object.hue_threshold;
+				minSlider.value = response.object.hue - response.object.hue_threshold;
+			} else {
+				maxSlider.value = response.object.hue - response.object.hue_threshold;
+				minSlider.value = response.object.hue + response.object.hue_threshold;
+			}
+			
+			maxSlider = document.getElementById("saturationmax");
+			minSlider = document.getElementById("saturationmin");
+			if(parseInt(maxSlider.value) > parseInt(minSlider.value)) {
+				maxSlider.value = response.object.saturation + response.object.saturation_threshold;
+				minSlider.value = response.object.saturation - response.object.saturation_threshold;
+			} else {
+				maxSlider.value = response.object.saturation - response.object.saturation_threshold;
+				minSlider.value = response.object.saturation + response.object.saturation_threshold;
+			}
+			
+			maxSlider = document.getElementById("valuemax");
+			minSlider = document.getElementById("valuemin");
+			if(parseInt(maxSlider.value) > parseInt(minSlider.value)) {
+				maxSlider.value = response.object.value + response.object.value_threshold;
+				minSlider.value = response.object.value - response.object.value_threshold;
+			} else {
+				maxSlider.value = response.object.value - response.object.value_threshold;
+				minSlider.value = response.object.value + response.object.value_threshold;
+			}
+			
+		}
+		
+		document.getElementById("originalpictureleft").src = response.originalleft;
+		document.getElementById("originalpictureright").src = response.originalright;
+		document.getElementById("processedpictureleft").src = response.processedleft;
+		document.getElementById("processedpictureright").src = response.processedright;
+		document.getElementById("object").innerHTML = "x: " + response.object.x + " / y:" + response.object.y + " / z: " + response.object.size;
+	
+		space.drawAxis();
+		var x = response.object.x / 530;
+		var y = -response.object.y / 370
+		var z = (response.object.size - 2500) / 500;
+		if(Math.abs(x) < 1 && Math.abs(y) < 1 && Math.abs(z) < 1)
+			space.drawPoint(x, y, z);
+	}
+
+	function requestSharedMemory() {
+		if(objectChanged) {
+			var huemax = parseInt(document.getElementById("huemax").value);
+			var huemin = parseInt(document.getElementById("huemin").value);
+			var saturationmax = parseInt(document.getElementById("saturationmax").value);
+			var saturationmin = parseInt(document.getElementById("saturationmin").value);
+			var valuemax = parseInt(document.getElementById("valuemax").value);
+			var valuemin = parseInt(document.getElementById("valuemin").value);
+			
+			var h = Math.round((huemax + huemin) / 2);
+			var ht = Math.abs(huemax - h);
+			var s = Math.round((saturationmax + saturationmin) / 2);
+			var st = Math.abs(saturationmax - s);
+			var v = Math.round((valuemax + valuemin) / 2);
+			var vt = Math.abs(valuemax - v);
+			
+			var move = 0;
+			if(document.getElementById("move").checked)
+				move = 1;
+			
+			objectChanged = false;
+
+			return "/cgi-bin/share.cgi?" + "move=" + move +
+				"&hue=" + h + "&saturation=" + s + "&value=" + v +
+				"&hue_threshold=" + ht + "&saturation_threshold=" + st + "&value_threshold=" + vt;
+		}
+		return "/cgi-bin/share.cgi";
+	}
+
+	function parseResponse(response) {
+		var elements = response.split(";");
+		if(elements.length < 6)
+			return null; 
+		var id = parseInt(elements[0].split("=")[1], 10);
+		var objectElements = elements[1].split(",");
+		var object = {
+			x:parseInt(objectElements[0].split("=")[1]),
+			y:parseInt(objectElements[1].split("=")[1]),
+			size:parseInt(objectElements[2].split("=")[1]),
+			hue:parseInt(objectElements[3].split("=")[1]),
+			saturation:parseInt(objectElements[4].split("=")[1]),
+			value:parseInt(objectElements[5].split("=")[1]),
+			hue_threshold:parseInt(objectElements[6].split("=")[1]),
+			saturation_threshold:parseInt(objectElements[7].split("=")[1]),
+			value_threshold:parseInt(objectElements[8].split("=")[1])
+		};
+		var originalleft = "data:image/jpeg;base64," + elements[2].split("=")[1];
+		var originalright = "data:image/jpeg;base64," + elements[3].split("=")[1];
+		var processedleft = "data:image/jpeg;base64," + elements[4].split("=")[1];
+		var processedright = "data:image/jpeg;base64," + elements[5].split("=")[1];
+		return {id:id, originalleft:originalleft, originalright:originalright, processedleft:processedleft, processedright:processedright, object:object};
+	}
+	</script>
+</body>
+</html>

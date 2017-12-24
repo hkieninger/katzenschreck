@@ -1,0 +1,22 @@
+this programm was written for a RaspberryPi 3
+it can also be run on a normal linux computer, but the  part for the following of the object should be removed
+
+the programm requires a webserver installed on the pc
+with cgi enabled in the directory /usr/lib/cgi-bin/ (default location)
+an other directory can also be chosen, but then the Makefile must be modified
+
+the directory for the webpages must be /var/www/html/ (default location)
+an other directory can also be chosen, but then the Makefile must be modified
+
+instruction to install apache2 and enable cgi can be found here:
+https://code-maven.com/set-up-cgi-with-apache
+
+furthermore the programm requires libjpeg und wiringPi installed
+on debian based system, such as the rpi, this can be done with the following command
+sudo apt-get install libjpeg-dev
+
+the webcam should be able to deliver the pictures in the yuv 4:2:2 (ycbcr) format (what most webcams do)
+the programm uses a resolution of 640x480, higher resolutions could also be used for higher precision, but then some constants must be modified
+
+the entire programm is written by me, except the library for the base64 encoding and the library for cgi
+for their licenses please check the source-files
